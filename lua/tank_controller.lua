@@ -125,7 +125,11 @@ local function stir_thread()
       if outlets["Stir Pump"].physical_state then
         if os.time() - on_time >= (5*60) then
           log.notice("Stir Pump timeout, turning off")
-          outlets["Stir Pump"].off()
+          if outlets["Stir Pump"].persistent_state then
+            outlets["Stir Pump"].persistent_state = off
+          else
+            outlets["Stir Pump"].off()
+          end
         end
       else
         local t = os.date("*t")
