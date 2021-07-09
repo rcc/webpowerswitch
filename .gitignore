@@ -1,0 +1,10 @@
+notes.txt
+cscope.out
+cscope.files
+.DS_Store
+
+*.swp
+*.swo
+*.pyc
+*.vim
+_tmp_*
