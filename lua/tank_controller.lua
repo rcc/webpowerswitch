@@ -2,6 +2,9 @@
 
 This script is designed to control aquarium equipment.
 
+The outlets will be looked up by the names at the top of the script.
+Outlets must be assigned the same names using the Setup UI.
+
 Date:    %%%DATE%%%
 Version: %%%VERSION%%%
 
@@ -33,19 +36,6 @@ local function map_outlets_by_name()
   end
 end
 
--- Poll Queue Thread
--- Populates a timeout event into all poll queues repeatedly
-local function poll_queue_thread()
-  while true do
-    for _,t,data in event.stream(event.timeout(60)) do
-      for i,v in ipairs(poll_queues) do
-        v[#v+1] = {t,i}
-      end
-      break
-    end
-  end
-end
-
 -- Light Thread
 -- Thread responsible for managing the light outlet
 local function light_thread()
@@ -60,26 +50,22 @@ local function light_thread()
 
   -- initialize on_time to now
   local on_time = os.time()
-  -- setup our polling event queue
-  local pq = event.queue()
-  poll_queues[#poll_queues+1] = pq
-  -- process events
   for i,t,data in event.stream(
-        pq,
         event.change_listener(outlets["Light"]),
+        event.local_time({sec=10}), -- 1 minute poll
         event.local_time({hour=7,min=45}), -- on time
         event.local_time({hour=21,min=00}) -- off time
     ) do
-    if i == 1 then -- Poll
+    if i == 1 and data.key == "physical_state" then -- outlet change
+      if outlets["Light"].physical_state then
+        on_time = os.time()
+      end
+    elseif i == 2 then -- Poll
       if outlets["Light"].physical_state then
         if os.time() - on_time >= (8*60*60) then
           log.notice("Light timeout, turning off")
           outlets["Light"].persistent_state = off
         end
-      end
-    elseif i == 2 and data.key == "physical_state" then -- outlet change
-      if outlets["Light"].physical_state then
-        on_time = os.time()
       end
     elseif i == 3 then -- on time
       log.notice("Light on time")
@@ -126,15 +112,16 @@ local function stir_thread()
 
   -- initialize on_time to now
   local on_time = os.time()
-  -- setup our polling event queue
-  local pq = event.queue()
-  poll_queues[#poll_queues+1] = pq
   -- process events
   for i,t,data in event.stream(
-        pq,
-        event.change_listener(outlets["Stir Pump"])
+        event.change_listener(outlets["Stir Pump"]),
+        event.local_time({sec=10}) -- 1 minute poll
     ) do
-    if i == 1 then -- Poll
+    if i == 1 and data.key == "physical_state" then -- outlet change
+      if outlets["Stir Pump"].physical_state then
+        on_time = os.time()
+      end
+    elseif i == 2 then -- Poll
       if outlets["Stir Pump"].physical_state then
         if os.time() - on_time >= (5*60) then
           log.notice("Stir Pump timeout, turning off")
@@ -149,10 +136,6 @@ local function stir_thread()
           end
         end
       end
-    elseif i == 2 and data.key == "physical_state" then -- outlet change
-      if outlets["Stir Pump"].physical_state then
-        on_time = os.time()
-      end
     end
   end
 end
@@ -162,9 +145,7 @@ end
 function start()
   log.notice("Starting scripts")
   map_outlets_by_name()
-  poll_queues = {}
   delay(3)
-  thread.run(poll_queue_thread,"Poll queue")
   thread.run(light_thread,"Control light outlet")
   thread.run(heater_thread,"Control heater outlet")
   thread.run(stir_thread,"Control stir pump outlet")
