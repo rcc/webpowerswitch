@@ -6,7 +6,7 @@ The outlets will be looked up by the names at the top of the script.
 Outlets must be assigned the same names using the Setup UI.
 
 Date:    %%%DATE%%%
-Version: %%%VERSION%%%
+Version: %%%SCMBRANCH%%%/%%%SCMVERSION%%%
 
 ]]--
 
@@ -30,7 +30,7 @@ local function map_outlets_by_name()
   for i,v in ipairs(outlet_names) do
     local o = find_outlet(v)
     if o then
-      log.notice("%s outlet is #%g",v,o)
+      log.info("%s outlet is #%g",v,o)
       outlets[v] = outlet[o]
     end
   end
@@ -46,7 +46,7 @@ local function light_thread()
   end
   -- this log line is required since this thread must interact with the
   -- outlet before the event change notifications will work
-  log.notice("Light outlet state: %s",tostring(outlets["Light"].state))
+  log.info("Light outlet state: %s",tostring(outlets["Light"].state))
 
   -- initialize on_time to now
   local on_time = os.time()
@@ -147,9 +147,15 @@ end
 -- Start
 -- Script entry script
 function start()
-  log.notice("Starting scripts")
+  local blank=string.rep(" ",ui.column_count)
+  log.info("Version: %%%SCMBRANCH%%%/%%%SCMVERSION%%%");
+  log.info("Build Date: %%%DATE%%%");
+  ui.line[1] = "B:%%%SCMBRANCH%%%"..blank
+  ui.line[2] = "V:%%%SCMVERSION%%%"..blank
+
   map_outlets_by_name()
   delay(3)
+  log.info("Starting scripts")
   thread.run(light_thread,"Control light outlet")
   thread.run(heater_thread,"Control heater outlet")
   thread.run(stir_thread,"Control stir pump outlet")
