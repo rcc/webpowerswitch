@@ -144,6 +144,47 @@ local function stir_thread()
   end
 end
 
+-- Filter Thread
+-- Thread responsible for managing the filter outlet
+local function filter_thread()
+  -- check if there is an outlet to control
+  if outlets["Filter"] == nil then
+    log.warning("No Filter outlet found")
+    return
+  end
+
+  -- filter should be on by default
+  if not outlets["Filter"].persistent_state then
+    outlets["Filter"].persistent_state = on
+  end
+
+  -- initialize off_time to now
+  local off_time = os.time()
+
+  -- process events
+  for i,t,data in event.stream(
+        event.change_listener(outlets["Filter"]),
+        event.local_time({sec=10}) -- 1 minute poll
+    ) do
+    if i == 1 and data.key == "physical_state" then -- outlet change
+      if not outlets["Filter"].physical_state then
+        off_time = os.time()
+      end
+    elseif i == 2 then -- Poll
+      if not outlets["Filter"].physical_state then
+        if os.time() - off_time >= (40*60) then
+          log.notice("Filter off timeout, turning on")
+          if not outlets["Filter"].persistent_state then
+            outlets["Filter"].persistent_state = on
+          else
+            outlets["Filter"].on()
+          end
+        end
+      end
+    end
+  end
+end
+
 -- Start
 -- Script entry script
 function start()
@@ -159,6 +200,7 @@ function start()
   thread.run(light_thread,"Control light outlet")
   thread.run(heater_thread,"Control heater outlet")
   thread.run(stir_thread,"Control stir pump outlet")
+  thread.run(filter_thread,"Control filter outlet")
 end
 
 -- vim: tabstop=2 shiftwidth=2 expandtab
